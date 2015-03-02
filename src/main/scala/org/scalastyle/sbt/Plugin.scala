@@ -29,47 +29,31 @@ import org.scalastyle.ScalastyleChecker
 import org.scalastyle.ScalastyleConfiguration
 import org.scalastyle.Output
 import org.scalastyle.XmlOutput
-import sbt.Configuration
-import sbt.Compile
-import sbt.Test
-import sbt.ConfigKey.configurationToKey
-import sbt.File
-import sbt.IO
-import sbt.inputKey
-import sbt.Keys.scalaSource
-import sbt.Keys.streams
-import sbt.Keys.target
-import sbt.Logger
-import sbt.Plugin
-import sbt.Process
-import sbt.Project
+import sbt._
+import Keys._
 import sbt.Scoped.t3ToTable3
 import sbt.Scoped.t6ToTable6
-import sbt.settingKey
-import sbt.taskKey
-import sbt.file
-import sbt.inputTask
-import sbt.richFile
 import sbt.std.TaskStreams
-import sbt.url
-import sbt.ScopedKey
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 import scala.language.implicitConversions
 import java.net.URL
 
-object ScalastylePlugin extends Plugin {
+object ScalastylePlugin extends AutoPlugin {
   import sbt.complete.DefaultParsers._
 
-  val scalastyle = inputKey[Unit]("Run scalastyle on your code")
-  val scalastyleGenerateConfig = taskKey[Unit]("Generate a default configuration files for scalastyle")
+  val autoImport = new Object {
+    val scalastyle = inputKey[Unit]("Run scalastyle on your code")
+    val scalastyleGenerateConfig = taskKey[Unit]("Generate a default configuration files for scalastyle")
 
-  val scalastyleTarget = settingKey[File]("XML output file from scalastyle")
-  val scalastyleConfig = settingKey[File]("Scalastyle configuration file")
-  val scalastyleConfigUrl = settingKey[Option[URL]]("Scalastyle configuration file as a URL")
-  val scalastyleFailOnError = settingKey[Boolean]("If true, Scalastyle will fail the task when an error level rule is violated")
-  val scalastyleConfigRefreshHours = settingKey[Integer]("How many hours until next run will fetch the scalastyle-config.xml again if location is a URI.")
-  val scalastyleConfigUrlCacheFile = settingKey[String]("If scalastyleConfigUrl is set, it will be cached here")
+    val scalastyleTarget = settingKey[File]("XML output file from scalastyle")
+    val scalastyleConfig = settingKey[File]("Scalastyle configuration file")
+    val scalastyleConfigUrl = settingKey[Option[URL]]("Scalastyle configuration file as a URL")
+    val scalastyleFailOnError = settingKey[Boolean]("If true, Scalastyle will fail the task when an error level rule is violated")
+    val scalastyleConfigRefreshHours = settingKey[Integer]("How many hours until next run will fetch the scalastyle-config.xml again if location is a URI.")
+    val scalastyleConfigUrlCacheFile = settingKey[String]("If scalastyleConfigUrl is set, it will be cached here")
+  }
+  import autoImport._
 
   def rawScalastyleSettings(): Seq[sbt.Def.Setting[_]] =
     Seq(
@@ -94,8 +78,7 @@ object ScalastylePlugin extends Plugin {
       }
     )
 
-  override def projectSettings =
-    Seq(
+  override def buildSettings = super.buildSettings ++ Seq(
       scalastyleConfig := file("scalastyle-config.xml"),
       (scalastyleConfig in Test) := (scalastyleConfig in scalastyle).value,
       scalastyleConfigUrl := None,
@@ -228,7 +211,10 @@ object Tasks {
           val entryName = connection.getEntryName
           val jarFile = connection.getJarFile
 
-          jarFile.entries.filter(_.getName == entryName).foreach { e => createFile(jarFile, e, target) }
+          val acc = jarFile.entries
+          var elements = List[JarEntry]()
+          while (acc.hasMoreElements) elements ::= acc.nextElement()
+          elements.filter(_.getName == entryName).foreach { e => createFile(jarFile, e, target) }
         }
         case _ => // nothing
       }
